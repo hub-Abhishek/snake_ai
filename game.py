@@ -39,6 +39,7 @@ class Game():
         self.initial_snake_positions = self.snakes.copy()
 
         self.dir = None
+        self.moves_list = []
 
         print(f'food positions - {self.food_positions}')
         print(f'snake heads - {self.snake_heads}')
@@ -108,7 +109,10 @@ class Game():
         return arr[(arr>=0) & (arr<self.size)]
     
     def get_positions(self, count, ):
-        return np.random.randint(0, self.board.shape, (count, 2))
+        pos = np.random.randint(0, self.board.shape, (count, 2))
+        while self.check_eligibility_of_position(pos[0]):
+            pos = np.random.randint(0, self.board.shape, (count, 2))
+        return pos
 
     def print_board(self):
         string = ''
@@ -141,6 +145,9 @@ class Game():
         if dir is None:
             dir = np.random.choice(['up', 'down', 'left', 'right'], 1)
             self.dir = None
+        else:
+            self.dir = dir
+        self.moves_list.append(dir)
         print(f'Moving {dir}')
 
         self.original_state = self.board.copy()        
@@ -172,6 +179,7 @@ class Game():
         # pdb.set_trace()
         if inside_board or snake_bite:
             print("you're dead")
+            print(f"moves list: {self.moves_list}")
         return not (inside_board or snake_bite)
 
     def shift_head_in_dir(self, snake_head, dir):
@@ -201,26 +209,8 @@ class Game():
 
 board_size, snake_count, food_count = 10, 1, 1
 game = Game(board_size, snake_count, food_count)
-print(game.zinda_hai_ki_nahi)
-# game.move('down')
-# game.move('left')
-# game.move()
-# game.move()
-# game.move()
-# game.move()
-# game.move('up')
-# game.move()
-# game.move()
-# game.move('right')
-# game.move()
-# game.move()
-# game.move()
-# game.move()
-# game.move('down')
-# game.move()
-
-# game.move('left')
-# game.move('up')
-# game.move()
+move_dict = {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right'}
 while game.zinda_hai_ki_nahi:
-    game.move()
+    dir = input('dir:')
+    dir = move_dict.get(dir, None)
+    game.move(dir)
