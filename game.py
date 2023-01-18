@@ -5,19 +5,23 @@ from scipy.spatial import distance
 DIRECTIONS = ['up', 'down', 'left', 'right']
 
 class Game():
-    def __init__(self, board_size=10, snake_count=1, food_count=1, snake_initial_size=3, set_seed=True, print_board=False) -> None:
+    def __init__(self, board_size=10, max_turns = 100, set_seed=True, print_board=False, seed=42) -> None: #snake_count=1, food_count=1, snake_initial_size=3, 
+    # def __init__(self, board_size=10, snake_count=1, food_count=1, snake_initial_size=3, set_seed=True, print_board=False) -> None:
         self.size = board_size
-        self.snake_count = snake_count
-        self.snake_initial_size = snake_initial_size
+        self.snake_count = 1 # snake_count
+        self.snake_initial_size = 3 #snake_initial_size
         self.snake_lengths = [self.snake_initial_size] * self.snake_count
-        self.food_count = food_count
+        self.food_count = 1 # food_count
+        self.seed = seed
+        self.max_turns = max_turns
 
         # random distinct numbers
-        self.food_val = -10
-        self.head_val = -5
-        self.body_val = -4
+        self.food_val = 99
+        self.head_val = 1
+        self.body_val = 2
         self.out_of_board = -100
         self.default_board_val = 0
+        self.turn = 0
 
         self.board = np.zeros((self.size, self.size))
         self.corners = np.array([[0, 0], [0, self.size-1], [self.size-1, 0], [self.size-1, self.size-1]])
@@ -27,7 +31,7 @@ class Game():
 
         self.print_board_ = print_board
         
-        self.get_initial_conditions(set_seed)
+        self.get_initial_conditions(set_seed, seed=self.seed)
         self.print_board(self.print_board_)
 
     
@@ -37,6 +41,7 @@ class Game():
 
         self.initial_food_positions = self.get_positions(self.food_count)
         self.initial_head_positions = self.get_positions(self.snake_count) # np.array([[9, 6]]) # 
+        self.turn = 0
         
         self.food_positions = self.initial_food_positions.copy()
         self.set_food_positions()
@@ -250,11 +255,11 @@ class Game():
             self.set_board_val(self.snake_heads[i], self.head_val)
 
 
-
-# board_size, snake_count, food_count, print_board = 10, 1, 1, True
-# game = Game(board_size, snake_count, food_count, print_board=print_board)
-# move_dict = {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right'}
-# while game.zinda_hai_ki_nahi:
-#     dir = input('dir:')
-#     dir = move_dict.get(dir, None)
-#     game.move(dir)
+if __name__=="__main__":
+    board_size, print_board = 10, True
+    game = Game(board_size, print_board=print_board, set_seed=False)
+    move_dict = {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right'}
+    while game.zinda_hai_ki_nahi:
+        dir = input('dir:')
+        dir = move_dict.get(dir, None)
+        game.move(dir)

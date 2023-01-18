@@ -82,15 +82,6 @@ class geneticPlayer:
     def generate_input(self, game, window_size):
         
         head = game.snake_heads[0]
-        # head = np.array([[0, 0]])[0]
-        # head = np.array([[0, 9]])[0]
-        # head = np.array([[9, 0]])[0]
-        # head = np.array([[9, 9]])[0]
-        # head = np.array([[0, 4]])[0]
-        # head = np.array([[4, 0]])[0]
-        # head = np.array([[9, 4]])[0]
-        # head = np.array([[4, 9]])[0]
-        # head = np.array([[7, 4]])[0]
         positions = game.get_all_eligible_neighbors(head, borders=True, window_size=window_size)
         input_vector = []
         for i, position in enumerate(positions):
