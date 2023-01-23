@@ -1,12 +1,13 @@
+# import numpy as np
+# import math
+# import copy
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as f
+#
+# from game import *
+import pygame
 import numpy as np
-import math
-import copy
-import torch
-import torch.nn as nn
-import torch.nn.functional as f
-
-from game import *
-
 
 PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI/'
 
