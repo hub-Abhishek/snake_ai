@@ -10,32 +10,6 @@ from game import *
 PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI'
 
 
-# class player:
-#     def __init__(self) -> None:
-#         pass
-
-#     def get_move(self):
-#         pass
-
-
-# class brain(nn.Module):
-#     def __init__(self, input_dim, hiddle_layers_num=4, hidden_sizes=[10, 10, 10, 10], num_outputs) -> None:
-#         super(brain, self).__init__()
-#         self.input_dim = input_dim
-#         self.hiddle_layers = hiddle_layers_num
-#         self.hidden_sizes = hidden_sizes
-#         self.num_outputs = num_outputs
-
-#         self.input_layer = nn.Linear(input_dim, hidden_sizes[0])
-#         self.hidden_layers = []
-#         for i in range(hiddle_layers_num-1):
-#             self.hidden_layers[i] = nn.Linear(hidden_sizes[i], hidden_sizes[i+1])
-#         self.final_layer = nn.Linear(hidden_sizes[hiddle_layers_num], num_outputs)
-
-
-#     def forward(self,x):
-#         x = nn.ReLU(self.input_layer())
-
 
 class geneticPlayer:
     def __init__(self, pop_size, num_trials, mutation_rate, mutation_change, input_window_size,

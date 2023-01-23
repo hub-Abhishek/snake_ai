@@ -7,54 +7,73 @@ DIRECTIONS = ['up', 'down', 'left', 'right']
 BLACK_BACKGROUND = (0, 0, 0)
 
 class Game:
-    def __init__(self, width=20, height=20, game_speed=30, display_option=True,
+    def __init__(self,
+                 food_count=1,
+                 width=20, height=20, game_speed=30, display_option=True,
                   print_board=False, set_seed=True, seed=42) -> None:
 
-        self.game_width = width * 20 + 40
-        self.game_height = height * 20 + 40
+        # game properties
+        self.food_count = food_count
         self.width = width
         self.height = height
 
-        self.seed = seed
-        self.set_seed = set_seed
+        self.snakes = []
+        self.food_positions = []
+        self.board = None
+        self.player = []
 
-        # random distinct numbers
+        self.corners = np.array([[0, 0], [0, self.height-1], [self.width-1, 0], [self.width-1, self.height-1]])
+
+        # random distinct position identifiers
         self.food_val = 3
         self.head_val = 2
         self.body_val = 1
         self.out_of_board = -100
         self.default_board_val = 0
 
-        self.corners = np.array([[0, 0], [0, self.height-1], [self.width-1, 0], [self.width-1, self.height-1]])
-        
+        # display properties
+        self.game_width = width * 20 + 40
+        self.game_height = height * 20 + 40
+
         self.print_board_ = print_board
         self.game_speed = game_speed
         self.display_option = display_option
 
-        self.snakes = []
-        self.food_position = []
-
         if display_option:
             self.screen = pygame.display.set_mode((self.game_width, self.game_height))
-            # self.screen.fill(BLACK_BACKGROUND)
-            # self.bg = pygame.image.load("img/background.png")
-            # pygame.display.set_caption('Snake')
+            self.screen.fill(BLACK_BACKGROUND)
+            self.food_image = pygame.image.load("img/food.png")
+            pygame.display.set_caption('Snake')
+            self.clock = pygame.time.Clock()
 
+        # randomization aspects
+        self.seed = seed
+        self.set_seed = set_seed
+
+        # lets go!!
         self.init_game()
 
 
     def init_game(self):
         if self.set_seed:
             np.random.seed(self.seed)
-        self.board = np.zeros((self.width, self.height))
-        self.food_position = self.get_empty_position()
+        self.food_positions = [self.get_empty_position()]
         self.update_board()
 
+    def update_board(self):
+        self.set_empty_board()
+        if self.food_positions:
+            for position in self.food_positions:
+                self.board[tuple(position)] = self.food_val
+        if len(self.snakes):
+            for i, pos in enumerate(self.snakes):
+                self.board[tuple(pos)] = self.head_val if i==0 else self.body_val
 
-    def
+    def set_empty_board(self):
+        self.board = np.zeros((self.width, self.height))
 
     def update_food(self):
-        self.food_position = self.get_empty_position()
+        self.food_positions = [self.get_empty_position()]
         self.update_board()
 
     def get_empty_position(self):
@@ -66,15 +85,50 @@ class Game:
         return [x_pos, y_pos]
 
     def check_eligibility_of_position(self, x_pos, y_pos):
-        if self.board[x_pos, y_pos] == 0:
-            return True
+        if x_pos < self.width and y_pos < self.height:
+            if not (any([[x_pos, y_pos] == z for z in self.food_positions])
+                    or any([[x_pos, y_pos] == z for z in self.snakes])):
+                return True
         else:
             return False
 
-    def update_board(self):
-        self.board[tuple(self.food_position)] = self.food_val
-        # self.game.board[tuple(self.food_position)] = self.head_val
-        # self.game.board[tuple(self.food_position)] = self.body_val
+    def display_ui(self):
+        myfont = pygame.font.SysFont('Segoe UI', 20)
+
+        for i in range(len(self.player)):
+            color = ""
+            if self.player[i].color == "green":
+                color = "Green"
+            if self.player[i].color == "blue":
+                color = "Blue"
+            if self.player[i].color == "red":
+                color = "Red"
+            if self.player[i].color == "purple":
+                color = "Purple"
+            text_score = myfont.render(color + ' Snake Score: ' + str(self.player[i].score), True, (0, 0, 0))
+            text_highest = myfont.render('Record: ' + str(self.player[i].record), True, (0, 0, 0))
+            avg = self.player[i].total_score / (self.player[i].deaths + 1)
+            text_avg = myfont.render('Avg: ' + str(round(avg)), True, (0, 0, 0))
+            self.gameDisplay.blit(text_score, (35, 440 + i*20))
+            self.gameDisplay.blit(text_highest, (230, 440 + i*20))
+            self.gameDisplay.blit(text_avg, (340, 440 + i*20))
+
+        self.gameDisplay.blit(self.bg, (10, 10))
+
+    def display_food(self, x_pos, y_pos):
+        self.screen.blit(self.food_image, (x_pos*20, y_pos*20))
+        pygame.display.update()
+        while 1==1:
+            print(123)
+
+    def display(self):
+        if self.display_option:
+            # self.display_ui()
+            for player in self.player:
+                player.display_player(self)
+            for food in self.food_positions:
+                self.display_food(*food)
+
 
 
 if __name__=="__main__":
