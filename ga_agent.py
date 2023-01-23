@@ -7,20 +7,55 @@ import torch.nn.functional as f
 
 from game import *
 
+PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI'
 
-PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI/'
+
+# class player:
+#     def __init__(self) -> None:
+#         pass
+
+#     def get_move(self):
+#         pass
 
 
-class Player:
-    def __init__(self, max_turns=100, set_seed=True, seed=42,):
+# class brain(nn.Module):
+#     def __init__(self, input_dim, hiddle_layers_num=4, hidden_sizes=[10, 10, 10, 10], num_outputs) -> None:
+#         super(brain, self).__init__()
+#         self.input_dim = input_dim
+#         self.hiddle_layers = hiddle_layers_num
+#         self.hidden_sizes = hidden_sizes
+#         self.num_outputs = num_outputs
 
-        self.snake_initial_size = 3
-        self.food_count = 1
-        self.zinda_hai_ki_nahi = True
-        self.max_turns = max_turns
+#         self.input_layer = nn.Linear(input_dim, hidden_sizes[0])
+#         self.hidden_layers = []
+#         for i in range(hiddle_layers_num-1):
+#             self.hidden_layers[i] = nn.Linear(hidden_sizes[i], hidden_sizes[i+1])
+#         self.final_layer = nn.Linear(hidden_sizes[hiddle_layers_num], num_outputs)
 
-        self.seed = seed
-        self.set_seed = set_seed
+
+#     def forward(self,x):
+#         x = nn.ReLU(self.input_layer())
+
+
+class geneticPlayer:
+    def __init__(self, pop_size, num_trials, mutation_rate, mutation_change, input_window_size,
+                 num_hidden_layers, hidden_layers_size, output_size=4, num_gen=5, move_limit=100):
+        self.pop_size = pop_size  # population size
+        self.num_trials = num_trials
+        self.mutation_rate = mutation_rate
+        self.mutation_change = mutation_change
+        self.move_limit = move_limit
+        self.num_gen = num_gen
+
+        self.input_window_size = input_window_size
+
+        self.input_size = (input_window_size * input_window_size) - 1 + 4
+        self.num_hidden_layers = num_hidden_layers
+        self.hidden_layers_size = hidden_layers_size
+        self.output_size = output_size
+
+        self.brains = self.generate_brains(self.pop_size, self.input_size, self.num_hidden_layers,
+                                           self.hidden_layers_size, self.output_size)
 
     def generate_brains(self, pop_size, input_size, num_hidden_layers, hidden_layers_size, output_size):
         brains = []
@@ -34,8 +69,8 @@ class Player:
         layers = []
         layers.append(nn.LayerNorm(input_size))
         layers.append(nn.Linear(input_size, hidden_layers_size[0]))
-        for layer in range(num_hidden_layers-1):
-            layers.append(nn.Linear(hidden_layers_size[layer], hidden_layers_size[layer+1]))
+        for layer in range(num_hidden_layers - 1):
+            layers.append(nn.Linear(hidden_layers_size[layer], hidden_layers_size[layer + 1]))
             layers.append(nn.Tanh())
         layers.append(nn.Linear(hidden_layers_size[-1], output_size))
         # layers.append(nn.Tanh())
@@ -46,7 +81,7 @@ class Player:
         return AI_bc
 
     def generate_input(self, game, window_size):
-        
+
         head = game.snake_heads[0]
         positions = game.get_all_eligible_neighbors(head, borders=True, window_size=window_size)
         input_vector = []
@@ -92,12 +127,12 @@ class Player:
             game.move(dir)
             moves += 1
         return moves, len(game.snakes[0])
-        
+
     def one_gen(self, board_size, snake_count, food_count, set_seed, gen=0, window_size=3):
         max_moves = [0] * self.pop_size
         max_scores = [0] * self.pop_size
         avg_scores = [[]] * self.pop_size
-        for i in range(self.pop_size):    
+        for i in range(self.pop_size):
             for j in range(self.num_trials):
                 # print(f'trial {j} for pop {i} for gen {gen}')
                 moves, score = self.run_one_trial(board_size, snake_count, food_count, set_seed, i, window_size)
@@ -106,24 +141,24 @@ class Player:
                     max_moves[i] = moves
                 if score > max_scores[i]:
                     max_scores[i] = score
-            avg_scores[i] = sum(avg_scores[i])/len(avg_scores[i])
+            avg_scores[i] = sum(avg_scores[i]) / len(avg_scores[i])
         # print(f'max moves for gen {gen} - {max_moves}')
         # print(f'max scores  for gen {gen} - {max_scores}')
         return np.array(max_moves), np.array(max_scores), np.array(avg_scores)
-        
-    
+
     def train_for_n_gen(self):
         num_gen = self.num_gen
         for gen in range(num_gen):
-            max_moves, max_scores, avg_scores = self.one_gen(board_size, snake_count, food_count, set_seed, gen, window_size=self.input_window_size)
+            max_moves, max_scores, avg_scores = self.one_gen(board_size, snake_count, food_count, set_seed, gen,
+                                                             window_size=self.input_window_size)
             # print(max_scores[np.argsort(max_scores)][::-1][:math.ceil(len(max_scores)/4)])
             # top_25 = np.argsort(max_scores)[::-1][:math.ceil(len(max_scores)/4)]
-            top_25 = np.argsort(avg_scores)[::-1][:math.ceil(len(avg_scores)/4)]
+            top_25 = np.argsort(avg_scores)[::-1][:math.ceil(len(avg_scores) / 4)]
             print(f"**END OF GEN {gen}**")
             print(f'max scores at the end of gen {gen} - {avg_scores}')
             print(f'max moves at the end of gen {gen} - {max_moves}')
             self.evolve(top_25)
-    
+
     def evolve(self, top_25):
         new_brains = []
         for brain in top_25:
@@ -131,14 +166,16 @@ class Player:
             new_brains.append(self.mutate(self.brains[brain]))
         self.brains = new_brains
         remaining = self.pop_size - len(self.brains)
-        self.brains += self.generate_brains(remaining,  self.input_size, self.num_hidden_layers, self.hidden_layers_size, self.output_size)
-
+        self.brains += self.generate_brains(remaining, self.input_size, self.num_hidden_layers, self.hidden_layers_size,
+                                            self.output_size)
 
     def mutate(self, brain):
         for layer in brain:
             if isinstance(layer, nn.Linear):
                 # new_weights = layer.weight + ((torch.rand(layer.weight.shape)<self.mutation_rate).long() * torch.normal(layer.weight.shape) * self.mutation_change)
-                new_weights = layer.weight + ((torch.rand(layer.weight.shape)<self.mutation_rate).long() * torch.empty(layer.weight.shape).normal_(mean=0,std=1) * self.mutation_change)
+                new_weights = layer.weight + (
+                            (torch.rand(layer.weight.shape) < self.mutation_rate).long() * torch.empty(
+                        layer.weight.shape).normal_(mean=0, std=1) * self.mutation_change)
                 layer.weight = nn.Parameter(new_weights, requires_grad=False)
         return brain
         # brain[1].weight = nn.Parameter(torch.rand(10, 12))
@@ -155,7 +192,7 @@ class Player:
             self.brains[pop].eval()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     pop_size = 500
     num_trials = 100
     move_limit = 100
@@ -165,21 +202,21 @@ if __name__=='__main__':
     mutation_change = 0.1
     input_window_size = 5
     # input_size = input_window_size + 4 # input window size + food location
-    
+
     num_hidden_layers = 4
-    hidden_layers_size = [25] *  num_hidden_layers
+    hidden_layers_size = [25] * num_hidden_layers
     output_size = 4
 
     board_size, snake_count, food_count, set_seed = 10, 1, 1, False
     # game = Game(board_size, snake_count, food_count)
-    
-    player = geneticPlayer(pop_size, num_trials, mutation_rate, mutation_change, input_window_size, 
-                 num_hidden_layers, hidden_layers_size, output_size, num_gen, move_limit)
+
+    player = geneticPlayer(pop_size, num_trials, mutation_rate, mutation_change, input_window_size,
+                           num_hidden_layers, hidden_layers_size, output_size, num_gen, move_limit)
 
     # player.one_gen(board_size, snake_count, food_count, set_seed)
     player.train_for_n_gen()
     player.save_brains(f'{PATH}/model')
-    # player.generate_input(game) 
+    # player.generate_input(game)
     # print(player.brains[-1])
     # print(torch.tensor(np.random.rand(1, 12)).float().shape)
     # print(player.brains[-1](torch.tensor(np.random.rand(1, 12)).float()).argmax())
