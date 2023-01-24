@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as f
 
 from game import *
+from player import *
 
 PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI'
 
@@ -25,14 +26,56 @@ class geneticPlayer:
         self.num_gen = num_gen
 
         self.input_window_size = input_window_size
-
         self.input_size = (input_window_size * input_window_size) - 1 + 4
         # self.num_hidden_layers = num_hidden_layers
-        self.hidden_layers_size = hidden_layers_size
+        self.layers = layers
         self.output_size = output_size
+        self.training = training
 
-        self.brains = self.generate_brains(self.pop_size, self.input_size, self.num_hidden_layers,
-                                           self.hidden_layers_size, self.output_size)
+        self.generate_brains(self.pop_size, self.layers)
+
+    def mutate(self):
+        pass
+
+    def crossover(self):
+        pass
+
+def weights_size(units):
+    s = 0
+    for i in range(len(units)-1):
+        s += units[i] * units[i+1]
+    return s
+
+def generate_brain(all_weights, layers):
+    model = nn.Sequential()
+    for i, layer in enumerate(layers[:-1]):
+        model.add_module(f'layer_{i}', nn.Linear(layers[i], layers[i + 1]))
+        model.add_module(f'activation_layer_{i}', nn.ReLU() if i != len(layers) - 2 else nn.Softmax())
+    for layer in model.parameters():
+        layer.requires_grad = False
+    return model
+
+def get_box(board, pos):
+    x_pos = pos[0]
+    y_pos = pos[1]
+
+
+def get_state(player):
+    player.init_game.update_board()
+    board_current_state = player.init_game.board.copy()
+    board_current_state = np.pad(board_current_state, 1, 'constant', constant_values=1)
+
+    x_pos = player.init_game.snakes[0][0]
+    y_pos = player.init_game.snakes[0][1]
+    box = board_current_state[x_pos:x_pos + 3, y_pos:y_pos + 3].flatten()
+    state = np.hstack([box[:4],
+                       box[5:],
+                       player.direction,
+                       player.where_food
+                       ])
+    return torch.tensor(state).float()
+
+
 
 
 if __name__=="__main__":
@@ -42,11 +85,37 @@ if __name__=="__main__":
     mutation_change = 0.1
     input_window_size = 5
     num_hidden_layers=5
-    layers = [12, 120, 120, 120, 4]
+    layers = [16, 120, 120, 120, 4]
     output_size = 4
     num_gen = 50
     move_limit = 100
-    training = False
+    training = True
+
+    num_weights = weights_size(layers)
+    all_param_shape = (pop_size, num_weights)
+    all_initial_weights = np.random.choice(np.arange(-1, 1, 0.0001), size=all_param_shape)
+
+    individual = np.random.randint(0, pop_size)
+    game, player = initialize_game_with_player()
+    all_weights = all_initial_weights
+    brain = generate_brain(all_weights, layers)
+    state = get_state(player)
+    direction_scores = brain(state)
+    direction = direction_scores.argmax()
+
+
+
+
+
+
+
+
+
+
+
+
+
+    print(123)
 
 #     def generate_brains(self, pop_size, input_size, num_hidden_layers, hidden_layers_size, output_size):
 #         brains = []

@@ -74,6 +74,8 @@ class Game:
 
     def update_food(self):
         self.food_positions = [self.get_empty_position()]
+        self.food_x = self.food_positions[0][0]
+        self.food_y = self.food_positions[0][1]
         self.update_board()
 
     def get_empty_position(self):

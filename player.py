@@ -5,7 +5,7 @@
 # import torch.nn as nn
 # import torch.nn.functional as f
 #
-# from game import *
+from game import *
 import pygame
 import numpy as np
 
@@ -47,6 +47,7 @@ class Player:
         for _ in range(self.snake_initial_size - 1):
             body_part = self.get_snake_body(self.init_game.snakes[-1])
             self.init_game.snakes.append(body_part)
+        self.check_direction()
         print(123)
 
     def get_snake_body(self, current_pos):
@@ -56,11 +57,13 @@ class Player:
         next = possible_options[np.random.choice(range(len(possible_options)))]
         return next
 
-    def move(self, dir):
+    def move(self, dir=None):
         if not self.aa_aa_aa_aa_stayin_alive:
             if self.verbose_level >= 2:
                 print('You\'re already dead mister!')
             return self.aa_aa_aa_aa_stayin_alive
+        if dir==None:
+            dir = self.last_move
         original_snakes = self.init_game.snakes.copy()
         current_head = self.init_game.snakes[0]
         move_dir = {
@@ -78,10 +81,11 @@ class Player:
                 print('You died mister!')
             return self.aa_aa_aa_aa_stayin_alive
         if any([new_head == z for z in self.init_game.food_positions]):
-            pass
+            self.init_game.update_food()
         else:
             self.init_game.snakes.pop(-1)
-            self.init_game.update_food()
+        self.last_move = dir
+        self.check_direction()
         return self.aa_aa_aa_aa_stayin_alive
 
     def check_eligibility_of_new_head(self, x_pos, y_pos):
@@ -94,6 +98,29 @@ class Player:
         else:
             return True
 
+    def check_direction(self):
+        directions = {
+            'left':  [ 1,  0],
+            'right': [-1,  0],
+            'up':    [ 0, -1],
+            'down':  [ 0,  1],
+        }
+        encoder = {
+            'left':  [1, 0, 0, 0],
+            'right': [0, 1, 0, 0],
+            'up':    [0, 0, 1, 0],
+            'down':  [0, 0, 0, 1],
+        }
+        direction = [y - x for x, y in zip(self.init_game.snakes[0], self.init_game.snakes[1])]
+        for k, v in directions.items():
+            if v == direction:
+                self.direction = encoder[k]
+
+        self.where_food = [self.init_game.food_positions[0][0] < self.init_game.snakes[0][0],
+                           self.init_game.food_positions[0][0] > self.init_game.snakes[0][0],
+                           self.init_game.food_positions[0][1] < self.init_game.snakes[0][0],
+                           self.init_game.food_positions[0][0] > self.init_game.snakes[0][0]]
+
     def display_player(self, ):
 
         self.init_game.screen.blit(self.snake_face_image, tuple([pos*20 for pos in self.init_game.snakes[0]]))
@@ -102,10 +129,16 @@ class Player:
         self.init_game.clock.tick(10)
 
 
+def initialize_game_with_player():
+    game = Game()
+    player = Player(game=game)
+    player.init_player()
+    player.init_game.player.append(player)
+    return game, player
 
 
 if __name__=="__main__":
-    game = Game()
+    game, player = initialize_game_with_player()
     player = Player(game=game)
     player.init_player()
     player.init_game.player.append(player)
