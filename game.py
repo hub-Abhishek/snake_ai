@@ -3,7 +3,7 @@ import pygame
 import pdb
 from scipy.spatial import distance
 
-DIRECTIONS = ['up', 'down', 'left', 'right']
+DIRECTIONS = ['left', 'right', 'up', 'down', ]
 BLACK_BACKGROUND = (0, 0, 0)
 
 class Game:

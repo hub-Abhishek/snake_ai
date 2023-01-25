@@ -40,22 +40,34 @@ class Player:
         self.snake_face_image.set_alpha(128)
 
     def init_player(self, game=None):
+        not_initialized = 0
         if game != None:
             self.init_game = game
+        while not_initialized == 0:
+            head = self.init_game.get_empty_position()
+            # self.init_game.snakes.append(head)
+            self.init_game.snakes = [head]
+            for _ in range(self.snake_initial_size - 1):
+                body_part = self.get_snake_body(self.init_game.snakes[-1])
+                not_initialized = 1 if body_part else 0
+                self.init_game.snakes.append(body_part)
+            self.check_direction()
 
-        head = self.init_game.get_empty_position()
-        # self.init_game.snakes.append(head)
-        self.init_game.snakes = [head]
-        for _ in range(self.snake_initial_size - 1):
-            body_part = self.get_snake_body(self.init_game.snakes[-1])
-            self.init_game.snakes.append(body_part)
-        self.check_direction()
 
     def get_snake_body(self, current_pos):
         cross = [[1,0], [0,1], [-1,0], [0,-1]]
         all_options = [[x + y for x, y in zip(current_pos, body)] for body in cross]
-        possible_options = [option  for option in all_options if self.init_game.check_eligibility_of_position(*option)]
-        next = possible_options[np.random.choice(range(len(possible_options)))]
+        possible_options = [option for option in all_options if self.init_game.check_eligibility_of_position(*option)]
+        try:
+            next = possible_options[np.random.choice(range(len(possible_options)))]
+        except:
+            next = None
+            print(possible_options)
+            print(all_options)
+            print(current_pos)
+            print(self.init_game.food_positions)
+            print(self.init_game.snakes)
+            # raise Exception
         return next
 
     def move(self, dir=None):
@@ -112,27 +124,31 @@ class Player:
                 return True
 
     def check_direction(self):
-        directions = {
-            'left':  [ 1,  0],
-            'right': [-1,  0],
-            'up':    [ 0, -1],
-            'down':  [ 0,  1],
-        }
-        encoder = {
-            'left':  [1, 0, 0, 0],
-            'right': [0, 1, 0, 0],
-            'up':    [0, 0, 1, 0],
-            'down':  [0, 0, 0, 1],
-        }
-        direction = [y - x for x, y in zip(self.init_game.snakes[0], self.init_game.snakes[1])]
-        for k, v in directions.items():
-            if v == direction:
-                self.direction = encoder[k]
+        # directions = {
+        #     'left':  [ 1,  0],
+        #     'right': [-1,  0],
+        #     'up':    [ 0, -1],
+        #     'down':  [ 0,  1],
+        # }
+        # encoder = {
+        #     'left':  [1, 0, 0, 0],
+        #     'right': [0, 1, 0, 0],
+        #     'up':    [0, 0, 1, 0],
+        #     'down':  [0, 0, 0, 1],
+        # }
+        # direction = [y - x for x, y in zip(self.init_game.snakes[0], self.init_game.snakes[1])]
+        # for k, v in directions.items():
+        #     if v == direction:
+        #         self.direction = encoder[k]
+        self.direction = [self.init_game.snakes[0][0] < self.init_game.snakes[1][0], # l
+                           self.init_game.snakes[0][0] > self.init_game.snakes[1][0], # r
+                           self.init_game.snakes[0][1] < self.init_game.snakes[1][1], # U
+                           self.init_game.snakes[0][1] > self.init_game.snakes[1][1]] # d
 
         self.where_food = [self.init_game.food_positions[0][0] < self.init_game.snakes[0][0],
                            self.init_game.food_positions[0][0] > self.init_game.snakes[0][0],
-                           self.init_game.food_positions[0][1] < self.init_game.snakes[0][0],
-                           self.init_game.food_positions[0][0] > self.init_game.snakes[0][0]]
+                           self.init_game.food_positions[0][1] < self.init_game.snakes[0][1],
+                           self.init_game.food_positions[0][1] > self.init_game.snakes[0][1]]
 
     def display_player(self, ):
 
@@ -148,8 +164,8 @@ def restart_for_game(game):
     player.init_game.player = [player]
     return player
 
-def initialize_game_with_player():
-    game = Game()
+def initialize_game_with_player(set_seed=True):
+    game = Game(set_seed=set_seed)
     player = Player(game=game)
     player.init_player()
     player.init_game.player.append(player)
