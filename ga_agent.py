@@ -1,6 +1,8 @@
 import numpy as np
 import math
 import copy
+import os
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
@@ -46,10 +48,16 @@ def weights_size(units):
         s += units[i] * units[i+1]
     return s
 
-def generate_brain(all_weights, layers):
+def generate_brain(weights, layers):
+    current_weights = weights.copy()
     model = nn.Sequential()
     for i, layer in enumerate(layers[:-1]):
-        model.add_module(f'layer_{i}', nn.Linear(layers[i], layers[i + 1]))
+        perceptrons = nn.Linear(layers[i], layers[i + 1])
+        with torch.no_grad():
+            perceptrons.weight = nn.Parameter(
+                torch.Tensor(current_weights[:layers[i] * layers[i + 1]].reshape(perceptrons.weight.shape)))
+        current_weights = current_weights[layers[i] * layers[i + 1]:]
+        model.add_module(f'layer_{i}', perceptrons)
         model.add_module(f'activation_layer_{i}', nn.ReLU() if i != len(layers) - 2 else nn.Softmax())
     for layer in model.parameters():
         layer.requires_grad = False
@@ -76,135 +84,168 @@ def get_state(player):
     return torch.tensor(state).float()
 
 
+def run_for_one_individual(weights, layers, max_moves, max_steps_per_food):
+    game, player = initialize_game_with_player()
+    brain = generate_brain(weights, layers)
+    food_score = 0
+    total_food_score = 0
+    max_food_score = 0
+    current_move = 0
+    deaths = 0
+    slow_penalty = 0
+
+    for i in range(max_moves):
+        if player.verbose_level >= 3:
+            print(f'snake - ', player.init_game.snakes)
+            print(f'food - ', player.init_game.food_positions)
+        state = get_state(player)
+        direction_scores = brain(state)
+        direction = direction_scores.argmax()
+        player.move(DIRECTIONS[direction])
+        if player.verbose_level>=3:
+            print(DIRECTIONS[direction])
+        if not player.aa_aa_aa_aa_stayin_alive:
+            player = restart_for_game(game)
+            deaths += 1
+            continue
+        if player.ate_in_last_move == 1:
+            current_move = 0
+            total_food_score += 1
+        else:
+            current_move += 1
+
+        if current_move >= max_steps_per_food:
+            player = restart_for_game(game)
+            slow_penalty += 1
+
+        food_score = len(player.init_game.snakes) - 3
+        if food_score > max_food_score:
+            max_food_score = food_score
+
+    return deaths * (-150) + max_food_score * 5000 + slow_penalty * (-1000) + int(max_moves / (total_food_score + 1)) * (-100), \
+           deaths, total_food_score / (deaths + 1), max_food_score
+def run_for_one_generation(pop_size, all_weights, layers, move_limit, max_steps_per_food, generation):
+    fitness = []
+    deaths = []
+    avg_score = []
+    max_scores = []
+    for individual in range(pop_size):
+        weights = all_weights[individual]
+        fit, snake_deaths, snake_avg_score, record = run_for_one_individual(weights, layers, move_limit, max_steps_per_food)
+        snake_avg_score = round(snake_avg_score, 2)
+        print('generation: ' + str(generation) + ' fitness value of snake ' + str(individual) + ':  ' + str(fit) +
+              '   Deaths: ' + str(snake_deaths) + '   Avg score: ' + str(snake_avg_score) + '   Record: ' + str(record))
+        fitness.append(fit)
+        deaths.append(snake_deaths)
+        avg_score.append(snake_avg_score)
+        max_scores.append(record)
+    return np.array(fitness), np.array(deaths), np.array(avg_score), np.array(max_scores)
+
+
+# def best_brains(all_brains, fitness, top_n):
+#     temp_fitness = np.array(fitness, copy=True)
+#     parents = np.empty((top_n, all_brains.shape[1]))
+#     for parent_num in range(top_n):
+#         max_fitness_idx = np.where(temp_fitness == np.max(temp_fitness))
+#         max_fitness_idx = max_fitness_idx[0][0]
+#         parents[parent_num, :] = all_brains[max_fitness_idx, :]
+#         temp_fitness[max_fitness_idx] = -99999999
+#     return parents
+
+def select_mating_pool(pop, fitness, num_parents):
+    temp_fitness = np.array(fitness, copy=True)
+    parents = np.empty((num_parents, pop.shape[1]))
+    for parent_num in range(num_parents):
+        max_fitness_idx = np.where(temp_fitness == np.max(temp_fitness))
+        max_fitness_idx = max_fitness_idx[0][0]
+        parents[parent_num, :] = pop[max_fitness_idx, :]
+        temp_fitness[max_fitness_idx] = -99999999
+    return parents
+
+def crossover(parents, offspring_size):
+    offspring = np.empty(offspring_size)
+    for k in range(offspring_size[0]):
+        while True:
+            parent1_idx = random.randint(0, parents.shape[0] - 1)
+            parent2_idx = random.randint(0, parents.shape[0] - 1)
+            # produce offspring from two parents if they are different
+            if parent1_idx != parent2_idx:
+                for j in range(offspring_size[1]):
+                    if random.uniform(0, 1) < 0.5:
+                        offspring[k, j] = parents[parent1_idx, j]
+                    else:
+                        offspring[k, j] = parents[parent2_idx, j]
+                break
+    return offspring
+
+# mutating the offsprings generated from crossover to maintain variation in the population
+def mutation(offspring_crossover, mutations=1):
+    for idx in range(offspring_crossover.shape[0]):
+        for _ in range(mutations):
+            i = random.randint(0, offspring_crossover.shape[1]-1)
+            random_value = np.random.choice(np.arange(-1, 1, step=0.001), size=1, replace=False)
+            offspring_crossover[idx, i] = offspring_crossover[idx, i] + random_value
+    return offspring_crossover
 
 
 if __name__=="__main__":
+    num_gen = 100
     pop_size = 50
-    num_trials = 2
     mutation_rate = 0.1
     mutation_change = 0.1
-    input_window_size = 5
-    num_hidden_layers=5
+    mutations = 1 # TODO: replace
+    population_name = 'test'
     layers = [16, 120, 120, 120, 4]
-    output_size = 4
-    num_gen = 50
-    move_limit = 100
+    max_steps_per_food = 100
+    move_limit = 1000
+    top_n = int(pop_size/4)
     training = True
 
-    num_weights = weights_size(layers)
-    all_param_shape = (pop_size, num_weights)
-    all_initial_weights = np.random.choice(np.arange(-1, 1, 0.0001), size=all_param_shape)
+    if training:
+        num_weights = weights_size(layers)
+        all_param_shape = (pop_size, num_weights)
+        all_initial_brains = np.random.choice(np.arange(-1, 1, 0.0001), size=all_param_shape)
+        all_brains = all_initial_brains.copy()
 
-    individual = np.random.randint(0, pop_size)
-    game, player = initialize_game_with_player()
-    all_weights = all_initial_weights
-    brain = generate_brain(all_weights, layers)
-    state = get_state(player)
-    direction_scores = brain(state)
-    direction = direction_scores.argmax()
+        # for one generation for one individual
+        for generation in range(num_gen):
+            fitness, deaths, avg_score, max_scores = run_for_one_generation(pop_size, all_brains, layers, move_limit, max_steps_per_food, generation)
 
+            # print generation stats
+            print('fittest snake in geneneration ' + str(generation) + ' : ', np.max(fitness))
+            print('highest average score in geneneration ' + str(generation) + ' : ', np.max(avg_score))
+            print('average fitness value in geneneration ' + str(generation) + ' : ', np.sum(fitness) / pop_size)
+            print('average deaths in geneneration ' + str(generation) + ' : ', np.sum(deaths) / pop_size)
+            print('average score in geneneration ' + str(generation) + ' : ', np.sum(avg_score) / pop_size)
+            print('max score in geneneration ' + str(generation) + ' : ', max_scores[np.argmax(max_scores)])
 
+            ranks = fitness.argsort()
 
+            # survivors = all_brains[ranks][:top_n]
+            survivors = select_mating_pool(all_brains, fitness, top_n)
+            offspring_crossover = crossover(survivors, offspring_size=(all_brains.shape[0] - survivors.shape[0], num_weights))
+            # adding some variations to the offspring using mutation.
+            offspring_mutation = mutation(offspring_crossover, mutations)
+            # creating the new population based on the parents and offspring
+            all_brains[0:survivors.shape[0], :] = survivors
+            all_brains[survivors.shape[0]:, :] = offspring_mutation
 
-
-
-
-
-
-
-
-
-
+            # save generation stats
+            dir_path = "weights/genetic_algorithm/" + str(population_name) + "/"
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            path = "weights/genetic_algorithm/" + str(population_name) + "/stats.txt"
+            f = open(path, "a+")
+            f.write(str(generation) + "\n")
+            f.write(
+                str(np.max(fitness)) + " " + str(np.max(avg_score)) + " " + str(np.sum(fitness) / pop_size) + " " +
+                str(np.sum(deaths) / pop_size) + " " + str(np.sum(avg_score) / pop_size) + " " +
+                str(max_scores[np.argmax(max_scores)]) + " " + str(np.argmax(fitness)) + " \n")
+            f.close()
     print(123)
 
-#     def generate_brains(self, pop_size, input_size, num_hidden_layers, hidden_layers_size, output_size):
-#         brains = []
-#         for brain in range(pop_size):
-#             # AI_bc
-#             AI_bc = self.generate_individual_brain(input_size, num_hidden_layers, hidden_layers_size, output_size)
-#             brains.append(AI_bc)
-#         return brains
-#
-#     def generate_individual_brain(self, input_size, num_hidden_layers, hidden_layers_size, output_size):
-#         layers = []
-#         layers.append(nn.LayerNorm(input_size))
-#         layers.append(nn.Linear(input_size, hidden_layers_size[0]))
-#         for layer in range(num_hidden_layers - 1):
-#             layers.append(nn.Linear(hidden_layers_size[layer], hidden_layers_size[layer + 1]))
-#             layers.append(nn.Tanh())
-#         layers.append(nn.Linear(hidden_layers_size[-1], output_size))
-#         # layers.append(nn.Tanh())
-#         layers.append(nn.Softmax())
-#         AI_bc = nn.Sequential(*layers, )
-#         for layer in AI_bc.parameters():
-#             layer.requires_grad = False
-#         return AI_bc
-#
-#     def generate_input(self, game, window_size):
-#
-#         head = game.snake_heads[0]
-#         positions = game.get_all_eligible_neighbors(head, borders=True, window_size=window_size)
-#         input_vector = []
-#         for i, position in enumerate(positions):
-#             # import pdb; pdb.set_trace();
-#             input_vector_val = game.extract_position(position)
-#             if input_vector_val == game.food_val:
-#                 input_vector_val = 1
-#             elif input_vector_val == game.body_val:
-#                 input_vector_val = -1
-#             elif input_vector_val == game.default_board_val:
-#                 input_vector_val = 0
-#             elif input_vector_val == game.out_of_board:
-#                 input_vector_val = -1
-#             input_vector.append(input_vector_val)
-#         input_vector.append(head[0])
-#         input_vector.append(head[1])
-#         input_vector.append(game.food_positions[0][0])
-#         input_vector.append(game.food_positions[0][1])
-#         input_vector = torch.tensor(input_vector).float().reshape(-1, self.input_size)
-#         # print(input_vector.shape)
-#         return input_vector
-#
-#     def get_move(self, input, i):
-#         dir = self.brains[i](input).argmax()
-#         return DIRECTIONS[dir]
-#         # try:
-#         #     dir = self.brains[i](input).argmax()
-#         #     return DIRECTIONS[dir]
-#         # except:
-#         #     a = 1
-#
-#     def run_one_trial(self, board_size, snake_count, food_count, set_seed, i, window_size):
-#         moves = 0
-#         game = Game(board_size, snake_count, food_count, set_seed=set_seed)
-#         while game.zinda_hai_ki_nahi and moves <= self.move_limit:
-#             input = self.generate_input(game, window_size)
-#             # print(f'snake head: {game.snake_heads[0]}')
-#             # print(f'snake: {game.snakes}')
-#             # print(f'input: {input}')
-#             # print(f'matmul: {self.brains[i](input)}')
-#             dir = self.get_move(input, i)
-#             game.move(dir)
-#             moves += 1
-#         return moves, len(game.snakes[0])
-#
-#     def one_gen(self, board_size, snake_count, food_count, set_seed, gen=0, window_size=3):
-#         max_moves = [0] * self.pop_size
-#         max_scores = [0] * self.pop_size
-#         avg_scores = [[]] * self.pop_size
-#         for i in range(self.pop_size):
-#             for j in range(self.num_trials):
-#                 # print(f'trial {j} for pop {i} for gen {gen}')
-#                 moves, score = self.run_one_trial(board_size, snake_count, food_count, set_seed, i, window_size)
-#                 avg_scores[i].append(score)
-#                 if moves > max_moves[i]:
-#                     max_moves[i] = moves
-#                 if score > max_scores[i]:
-#                     max_scores[i] = score
-#             avg_scores[i] = sum(avg_scores[i]) / len(avg_scores[i])
-#         # print(f'max moves for gen {gen} - {max_moves}')
-#         # print(f'max scores  for gen {gen} - {max_scores}')
-#         return np.array(max_moves), np.array(max_scores), np.array(avg_scores)
+
+
 #
 #     def train_for_n_gen(self):
 #         num_gen = self.num_gen

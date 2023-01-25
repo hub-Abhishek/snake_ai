@@ -15,7 +15,7 @@ PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI/'
 class Player:
     def __init__(self, game, food_count=1,
                  snake_initial_size=3, max_turns=100,
-                 verbose_level=2, display_option=True,
+                 verbose_level=1, display_option=True,
                  print_board=False,
                  set_seed=True, seed=42,):
 
@@ -25,6 +25,7 @@ class Player:
         self.snake_initial_size = snake_initial_size
         self.max_turns = max_turns
         # self.zinda_hai_ki_nahi = True
+        self.ate_in_last_move = 0
         self.aa_aa_aa_aa_stayin_alive = True
 
         self.verbose_level = verbose_level
@@ -43,17 +44,17 @@ class Player:
             self.init_game = game
 
         head = self.init_game.get_empty_position()
-        self.init_game.snakes.append(head)
+        # self.init_game.snakes.append(head)
+        self.init_game.snakes = [head]
         for _ in range(self.snake_initial_size - 1):
             body_part = self.get_snake_body(self.init_game.snakes[-1])
             self.init_game.snakes.append(body_part)
         self.check_direction()
-        print(123)
 
     def get_snake_body(self, current_pos):
         cross = [[1,0], [0,1], [-1,0], [0,-1]]
         all_options = [[x + y for x, y in zip(current_pos, body)] for body in cross]
-        possible_options = [option if self.init_game.check_eligibility_of_position(*option) else '' for option in all_options]
+        possible_options = [option  for option in all_options if self.init_game.check_eligibility_of_position(*option)]
         next = possible_options[np.random.choice(range(len(possible_options)))]
         return next
 
@@ -64,6 +65,7 @@ class Player:
             return self.aa_aa_aa_aa_stayin_alive
         if dir==None:
             dir = self.last_move
+        self.ate_in_last_move = 0
         original_snakes = self.init_game.snakes.copy()
         current_head = self.init_game.snakes[0]
         move_dir = {
@@ -73,30 +75,41 @@ class Player:
             'down':  [ 0,  1],
         }
         new_head = [x + y for x, y in zip(current_head, move_dir[dir])]
-        self.init_game.snakes = [new_head] + self.init_game.snakes
-        self.aa_aa_aa_aa_stayin_alive = self.check_eligibility_of_new_head(*new_head)
+        self.aa_aa_aa_aa_stayin_alive = self.check_eligibility_of_new_head(*new_head, check=1)
         if not self.aa_aa_aa_aa_stayin_alive:
             self.init_game.snakes = original_snakes
             if self.verbose_level >= 2:
                 print('You died mister!')
             return self.aa_aa_aa_aa_stayin_alive
+
+        self.init_game.snakes = [new_head] + self.init_game.snakes
+        self.aa_aa_aa_aa_stayin_alive = self.check_eligibility_of_new_head(*new_head, check=2)
+        if not self.aa_aa_aa_aa_stayin_alive:
+            self.init_game.snakes = original_snakes
+            if self.verbose_level >= 2:
+                print('You died mister!')
+            return self.aa_aa_aa_aa_stayin_alive
+
         if any([new_head == z for z in self.init_game.food_positions]):
             self.init_game.update_food()
+            self.ate_in_last_move = 1
         else:
             self.init_game.snakes.pop(-1)
         self.last_move = dir
         self.check_direction()
         return self.aa_aa_aa_aa_stayin_alive
 
-    def check_eligibility_of_new_head(self, x_pos, y_pos):
-        if x_pos >=0 and x_pos < self.init_game.width and y_pos >=0 and y_pos < self.init_game.height:
-            pass
-        else:
-            False
-        if any([[x_pos, y_pos] == z for z in self.init_game.snakes[1:]]):
+    def check_eligibility_of_new_head(self, x_pos, y_pos, check):
+        if check==1:
+            if x_pos >=0 and x_pos < self.init_game.width and y_pos >=0 and y_pos < self.init_game.height:
+                return True
+            else:
                 return False
-        else:
-            return True
+        if check==2:
+            if any([[x_pos, y_pos] == z for z in self.init_game.snakes[1:]]):
+                    return False
+            else:
+                return True
 
     def check_direction(self):
         directions = {
@@ -128,6 +141,12 @@ class Player:
         pygame.display.flip()
         self.init_game.clock.tick(10)
 
+
+def restart_for_game(game):
+    player = Player(game=game)
+    player.init_player()
+    player.init_game.player = [player]
+    return player
 
 def initialize_game_with_player():
     game = Game()
