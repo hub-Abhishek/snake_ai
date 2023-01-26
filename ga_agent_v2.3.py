@@ -14,7 +14,7 @@ PATH = 'C:/Users/abhis/Downloads/New folder/project/Snake AI'
 
 
 
-class geneticPlayer:
+class GAAgent:
     def __init__(self, pop_size, num_trials, mutation_rate, mutation_change,
                  input_window_size,
                  layers, output_size=4, num_gen=5, move_limit=100,
@@ -42,11 +42,13 @@ class geneticPlayer:
     def crossover(self):
         pass
 
+
 def weights_size(units):
     s = 0
     for i in range(len(units)-1):
         s += units[i] * units[i+1]
     return s
+
 
 def generate_brain(weights, layers):
     current_weights = weights.copy()
@@ -62,10 +64,6 @@ def generate_brain(weights, layers):
     for layer in model.parameters():
         layer.requires_grad = False
     return model
-
-def get_box(board, pos):
-    x_pos = pos[0]
-    y_pos = pos[1]
 
 
 def get_state(player):
@@ -127,8 +125,10 @@ def run_for_one_individual(weights, layers, max_moves, max_steps_per_food):
         if food_score > max_food_score:
             max_food_score = food_score
 
-    return deaths * (-150) + max_food_score * 5000 + slow_penalty * (-1000) + int(max_moves / (total_food_score + 1)) * (-100), \
-           deaths, total_food_score / (deaths + 1), max_food_score
+    score = max_food_score * 5000 + deaths * (-150) + slow_penalty * (-1000) + int(max_moves / (total_food_score + 1)) * (-100)
+    return score, deaths, total_food_score / (deaths + 1), max_food_score
+
+
 def run_for_one_generation(pop_size, all_weights, layers, move_limit, max_steps_per_food, generation):
     fitness = []
     deaths = []
@@ -147,50 +147,54 @@ def run_for_one_generation(pop_size, all_weights, layers, move_limit, max_steps_
     return np.array(fitness), np.array(deaths), np.array(avg_score), np.array(max_scores)
 
 
-# def best_brains(all_brains, fitness, top_n):
-#     temp_fitness = np.array(fitness, copy=True)
-#     parents = np.empty((top_n, all_brains.shape[1]))
-#     for parent_num in range(top_n):
-#         max_fitness_idx = np.where(temp_fitness == np.max(temp_fitness))
-#         max_fitness_idx = max_fitness_idx[0][0]
-#         parents[parent_num, :] = all_brains[max_fitness_idx, :]
-#         temp_fitness[max_fitness_idx] = -99999999
-#     return parents
+def crossover(parents, num_offspring):
+    parent_ids = np.random.randint(0, parents.shape[0], (num_offspring[0], 2))
 
-def select_mating_pool(pop, fitness, num_parents):
-    temp_fitness = np.array(fitness, copy=True)
-    parents = np.empty((num_parents, pop.shape[1]))
-    for parent_num in range(num_parents):
-        max_fitness_idx = np.where(temp_fitness == np.max(temp_fitness))
-        max_fitness_idx = max_fitness_idx[0][0]
-        parents[parent_num, :] = pop[max_fitness_idx, :]
-        temp_fitness[max_fitness_idx] = -99999999
-    return parents
+    children_ids = np.random.binomial(1, 0.5, num_offspring)
+    children = np.multiply(children_ids, parents[parent_ids[:, 0]]) + np.multiply((1- children_ids), parents[parent_ids[:, 1]])
+    return children
 
-def crossover(parents, offspring_size):
-    offspring = np.empty(offspring_size)
-    for k in range(offspring_size[0]):
-        while True:
-            parent1_idx = random.randint(0, parents.shape[0] - 1)
-            parent2_idx = random.randint(0, parents.shape[0] - 1)
-            # produce offspring from two parents if they are different
-            if parent1_idx != parent2_idx:
-                for j in range(offspring_size[1]):
-                    if random.uniform(0, 1) < 0.5:
-                        offspring[k, j] = parents[parent1_idx, j]
-                    else:
-                        offspring[k, j] = parents[parent2_idx, j]
-                break
-    return offspring
 
-# mutating the offsprings generated from crossover to maintain variation in the population
-def mutation(offspring_crossover, mutations=1):
-    for idx in range(offspring_crossover.shape[0]):
-        for _ in range(mutations):
-            i = random.randint(0, offspring_crossover.shape[1]-1)
-            random_value = np.random.choice(np.arange(-1, 1, step=0.001), size=1, replace=False)
-            offspring_crossover[idx, i] = offspring_crossover[idx, i] + random_value
-    return offspring_crossover
+def mutation(children, mutations=1):
+    x = np.random.randint(0, children.shape[0], children.shape[0]*mutations)
+    y = np.random.randint(0, children.shape[1], children.shape[0]*mutations)
+    children[tuple(np.vstack([x, y]))] = np.round(np.random.uniform(-1, 1, children.shape[0]), 2)
+    return children
+
+
+def pprint(generation, fitness, avg_score, pop_size, deaths, max_scores):
+    print('fittest snake in geneneration ' + str(generation) + ' : ', np.max(fitness))
+    print('highest average score in geneneration ' + str(generation) + ' : ', np.max(avg_score))
+    print('average fitness value in geneneration ' + str(generation) + ' : ', np.sum(fitness) / pop_size)
+    print('average deaths in geneneration ' + str(generation) + ' : ', np.sum(deaths) / pop_size)
+    print('average score in geneneration ' + str(generation) + ' : ', np.sum(avg_score) / pop_size)
+    print('max score in geneneration ' + str(generation) + ' : ', max_scores[np.argmax(max_scores)])
+
+
+def save_stats(population_name, base_path, generation, fitness, avg_score, pop_size, deaths, max_scores):
+    dir_path = base_path + str(population_name) + "/"
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    path = base_path + str(population_name) + "/stats.txt"
+    f = open(path, "a+")
+    f.write(str(generation) + "\n")
+    f.write(
+        str(np.max(fitness)) + " " + str(np.max(avg_score)) + " " + str(np.sum(fitness) / pop_size) + " " +
+        str(np.sum(deaths) / pop_size) + " " + str(np.sum(avg_score) / pop_size) + " " +
+        str(max_scores[np.argmax(max_scores)]) + " " + str(np.argmax(fitness)) + " \n")
+    f.close()
+
+
+def save_weights(population_name, base_path, generation, all_brains):
+    path = base_path + str(population_name) + "/generation_" + str(generation) + ".txt"
+    np.savetxt(path, all_brains)
+    print("weights saved")
+
+
+def load_weights(population_name, base_path, generation=99):
+    path = base_path + str(population_name) + "/generation_" + str(generation) + ".txt"
+    all_brains = np.loadtxt(path)
+    return all_brains
 
 
 if __name__=="__main__":
@@ -201,10 +205,12 @@ if __name__=="__main__":
     mutations = 1 # TODO: replace
     population_name = 'test_2_3'
     layers = [16, 120, 120, 120, 4]
-    max_steps_per_food = 200
-    move_limit = 2000
+    max_steps_per_food = 5# 200
+    move_limit = 20# 2000
     top_n = int(pop_size/4)
     training = True
+
+    base_path = "weights/genetic_algorithm/"
 
     if training:
         num_weights = weights_size(layers)
@@ -217,115 +223,19 @@ if __name__=="__main__":
             fitness, deaths, avg_score, max_scores = run_for_one_generation(pop_size, all_brains, layers, move_limit, max_steps_per_food, generation)
 
             # print generation stats
-            print('fittest snake in geneneration ' + str(generation) + ' : ', np.max(fitness))
-            print('highest average score in geneneration ' + str(generation) + ' : ', np.max(avg_score))
-            print('average fitness value in geneneration ' + str(generation) + ' : ', np.sum(fitness) / pop_size)
-            print('average deaths in geneneration ' + str(generation) + ' : ', np.sum(deaths) / pop_size)
-            print('average score in geneneration ' + str(generation) + ' : ', np.sum(avg_score) / pop_size)
-            print('max score in geneneration ' + str(generation) + ' : ', max_scores[np.argmax(max_scores)])
+            pprint(generation, fitness, avg_score, pop_size, deaths, max_scores)
+            if generation%5==0:
+                save_weights(population_name, base_path, generation, all_brains)
 
+            # Next gen
             ranks = fitness.argsort()
-            # survivors = all_brains[ranks[::-1]]
+            survivors = all_brains[ranks[::-1]][:top_n]
+            children = crossover(survivors, num_offspring=(all_brains.shape[0] - survivors.shape[0], num_weights))
+            smart_children = mutation(children, mutations)
+            all_brains = np.vstack([survivors, smart_children])
 
-            # survivors = all_brains[ranks][:top_n]
-            survivors = select_mating_pool(all_brains, fitness, top_n)
-            offspring_crossover = crossover(survivors, offspring_size=(all_brains.shape[0] - survivors.shape[0], num_weights))
-            # adding some variations to the offspring using mutation.
-            offspring_mutation = mutation(offspring_crossover, mutations)
-            # creating the new population based on the parents and offspring
-            all_brains[0:survivors.shape[0], :] = survivors
-            all_brains[survivors.shape[0]:, :] = offspring_mutation
-
-            # save generation stats
-            dir_path = "weights/genetic_algorithm/" + str(population_name) + "/"
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path)
-            path = "weights/genetic_algorithm/" + str(population_name) + "/stats.txt"
-            f = open(path, "a+")
-            f.write(str(generation) + "\n")
-            f.write(
-                str(np.max(fitness)) + " " + str(np.max(avg_score)) + " " + str(np.sum(fitness) / pop_size) + " " +
-                str(np.sum(deaths) / pop_size) + " " + str(np.sum(avg_score) / pop_size) + " " +
-                str(max_scores[np.argmax(max_scores)]) + " " + str(np.argmax(fitness)) + " \n")
-            f.close()
-            path = "weights/genetic_algorithm/" + str(population_name) + "/generation_" + str(generation) + ".txt"
-            np.savetxt(path, all_brains)
-            print("weights saved")
-
-
-
-#
-#     def train_for_n_gen(self):
-#         num_gen = self.num_gen
-#         for gen in range(num_gen):
-#             max_moves, max_scores, avg_scores = self.one_gen(board_size, snake_count, food_count, set_seed, gen,
-#                                                              window_size=self.input_window_size)
-#             # print(max_scores[np.argsort(max_scores)][::-1][:math.ceil(len(max_scores)/4)])
-#             # top_25 = np.argsort(max_scores)[::-1][:math.ceil(len(max_scores)/4)]
-#             top_25 = np.argsort(avg_scores)[::-1][:math.ceil(len(avg_scores) / 4)]
-#             print(f"**END OF GEN {gen}**")
-#             print(f'max scores at the end of gen {gen} - {avg_scores}')
-#             print(f'max moves at the end of gen {gen} - {max_moves}')
-#             self.evolve(top_25)
-#
-#     def evolve(self, top_25):
-#         new_brains = []
-#         for brain in top_25:
-#             new_brains.append(copy.deepcopy(self.brains[brain]))
-#             new_brains.append(self.mutate(self.brains[brain]))
-#         self.brains = new_brains
-#         remaining = self.pop_size - len(self.brains)
-#         self.brains += self.generate_brains(remaining, self.input_size, self.num_hidden_layers, self.hidden_layers_size,
-#                                             self.output_size)
-#
-#     def mutate(self, brain):
-#         for layer in brain:
-#             if isinstance(layer, nn.Linear):
-#                 # new_weights = layer.weight + ((torch.rand(layer.weight.shape)<self.mutation_rate).long() * torch.normal(layer.weight.shape) * self.mutation_change)
-#                 new_weights = layer.weight + (
-#                             (torch.rand(layer.weight.shape) < self.mutation_rate).long() * torch.empty(
-#                         layer.weight.shape).normal_(mean=0, std=1) * self.mutation_change)
-#                 layer.weight = nn.Parameter(new_weights, requires_grad=False)
-#         return brain
-#         # brain[1].weight = nn.Parameter(torch.rand(10, 12))
-#         # (torch.rand(10, 12)>0.5).long()
-#         # pass
-#
-#     def save_brains(self, PATH):
-#         for i, brain in enumerate(self.brains):
-#             torch.save(brain, f'{PATH}_brain_{i}.pt')
-#
-#     def load_brains(self, PATH):
-#         for pop in range(self.pop_size):
-#             self.brains[pop] = torch.load(f'{PATH}_brain_{pop}.pt')
-#             self.brains[pop].eval()
-#
-#
-# if __name__ == '__main__':
-#     pop_size = 500
-#     num_trials = 100
-#     move_limit = 100
-#     num_gen = 500
-#
-#     mutation_rate = 0.15
-#     mutation_change = 0.1
-#     input_window_size = 5
-#     # input_size = input_window_size + 4 # input window size + food location
-#
-#     num_hidden_layers = 4
-#     hidden_layers_size = [25] * num_hidden_layers
-#     output_size = 4
-#
-#     board_size, snake_count, food_count, set_seed = 10, 1, 1, False
-#     # game = Game(board_size, snake_count, food_count)
-#
-#     player = geneticPlayer(pop_size, num_trials, mutation_rate, mutation_change, input_window_size,
-#                            num_hidden_layers, hidden_layers_size, output_size, num_gen, move_limit)
-#
-#     # player.one_gen(board_size, snake_count, food_count, set_seed)
-#     player.train_for_n_gen()
-#     player.save_brains(f'{PATH}/model')
-#     # player.generate_input(game)
-#     # print(player.brains[-1])
-#     # print(torch.tensor(np.random.rand(1, 12)).float().shape)
-#     # print(player.brains[-1](torch.tensor(np.random.rand(1, 12)).float()).argmax())
+            save_stats(population_name, base_path, generation, fitness, avg_score, pop_size, deaths, max_scores)
+    else:
+        generation = 99
+        all_brains = load_weights(population_name, base_path, generation)
+        brain = generate_brain(all_brains[0], layers)
