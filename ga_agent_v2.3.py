@@ -108,18 +108,22 @@ def run_for_one_individual(weights, layers, max_moves, max_steps_per_food):
         if not player.aa_aa_aa_aa_stayin_alive:
             player = restart_for_game(game)
             deaths += 1
+            food_score = 0
             continue
         if player.ate_in_last_move == 1:
             current_move = 0
             total_food_score += 1
+            food_score += 1
         else:
             current_move += 1
 
         if current_move >= max_steps_per_food:
             player = restart_for_game(game)
             slow_penalty += 1
+            current_move = 0
+            food_score = 0
 
-        food_score = len(player.init_game.snakes) - 3
+        # food_score = len(player.init_game.snakes) - 3
         if food_score > max_food_score:
             max_food_score = food_score
 
@@ -195,7 +199,7 @@ if __name__=="__main__":
     mutation_rate = 0.1
     mutation_change = 0.1
     mutations = 1 # TODO: replace
-    population_name = 'test'
+    population_name = 'test_2_3'
     layers = [16, 120, 120, 120, 4]
     max_steps_per_food = 200
     move_limit = 2000
@@ -221,6 +225,7 @@ if __name__=="__main__":
             print('max score in geneneration ' + str(generation) + ' : ', max_scores[np.argmax(max_scores)])
 
             ranks = fitness.argsort()
+            # survivors = all_brains[ranks[::-1]]
 
             # survivors = all_brains[ranks][:top_n]
             survivors = select_mating_pool(all_brains, fitness, top_n)
@@ -243,7 +248,9 @@ if __name__=="__main__":
                 str(np.sum(deaths) / pop_size) + " " + str(np.sum(avg_score) / pop_size) + " " +
                 str(max_scores[np.argmax(max_scores)]) + " " + str(np.argmax(fitness)) + " \n")
             f.close()
-    print(123)
+            path = "weights/genetic_algorithm/" + str(population_name) + "/generation_" + str(generation) + ".txt"
+            np.savetxt(path, all_brains)
+            print("weights saved")
 
 
 
