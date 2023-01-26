@@ -71,5 +71,5 @@ def GA_charts(population_name="test"):
     plt.show()
 
 
-GA_charts()
+GA_charts('test_2_3')
 

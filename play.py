@@ -1,20 +1,17 @@
 from game import *
 from player import *
+from ga_agent_v2_3 import *
 import numpy as np
 import pygame
 
 move_dict = {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right'}
 
 if __name__=="__main__":
-    game = Game()
+    base_path = "weights/genetic_algorithm/"
+    population_name = 'test_2_3'
 
-    player = Player(game=game)
-    player.init_player()
-    game.player.append(player)
-    player.init_game.player.append(player)
-    while player.aa_aa_aa_aa_stayin_alive:
-        dir = input('dir:')
-        dir = move_dict.get(dir, None)
-        player.move(dir)
-        print(player.init_game.snakes)
-        print(player.init_game.food_positions)
+
+    game, player = initialize_game_with_player(set_seed=False)
+    generation = 99
+    all_brains = load_weights(population_name, base_path, generation)
+    brain = generate_brain(all_brains[0], layers)

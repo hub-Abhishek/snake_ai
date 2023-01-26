@@ -235,7 +235,3 @@ if __name__=="__main__":
             all_brains = np.vstack([survivors, smart_children])
 
             save_stats(population_name, base_path, generation, fitness, avg_score, pop_size, deaths, max_scores)
-    else:
-        generation = 99
-        all_brains = load_weights(population_name, base_path, generation)
-        brain = generate_brain(all_brains[0], layers)
